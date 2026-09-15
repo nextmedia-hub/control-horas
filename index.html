@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Horas y Tareas (Google Auth)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs (Compat versions) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="min-h-screen bg-slate-50 flex flex-col justify-between">
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-[#00ff88] flex items-center justify-center text-slate-950 font-bold text-xl shadow-md">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900 tracking-tight">TimeTracker & Balance <span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full ml-2">Google Auth</span></h1>
+                    <p class="text-xs text-slate-500">Gestión segura protegida con autenticación</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <div id="auth-section" class="flex items-center space-x-2 text-xs bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                    <div id="user-info" class="hidden items-center space-x-2">
+                        <img id="user-avatar" src="" alt="Avatar" class="w-6 h-6 rounded-full border border-slate-300 object-cover">
+                        <span id="user-name" class="font-medium text-slate-700 hidden sm:inline"></span>
+                        <button onclick="logoutFirebase()" title="Cerrar sesión" class="text-slate-400 hover:text-rose-600 transition ml-1 pl-2 border-l border-slate-300">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                    <div id="login-guest-btn">
+                        <button onclick="openLoginModal()" class="font-medium text-slate-700 hover:text-slate-900 transition flex items-center space-x-1.5">
+                            <i class="fa-solid fa-user-lock text-[#00ff88]"></i>
+                            <span>Iniciar Sesión</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="add-task-btn" onclick="openModal()" class="bg-[#00ff88] hover:bg-[#00e078] text-slate-950 font-semibold px-4 py-2 rounded-xl text-sm transition shadow-sm hover:shadow flex items-center space-x-2 hidden">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>Agregar Tarea</span>
+                </button>
+                <button onclick="resetDataInFirebase()" title="Restablecer datos iniciales" class="text-slate-400 hover:text-rose-600 p-2 rounded-xl hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-rotate-right text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <div id="config-banner" class="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs text-amber-800 hidden">
+            <div class="flex items-start space-x-3">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500 text-base mt-0.5"></i>
+                <div>
+                    <span class="font-bold text-amber-900">Configuración de Firebase pendiente:</span> Estás usando datos de prueba locales. Puedes configurar tu propio Firebase en <code class="bg-amber-100 px-1 py-0.5 rounded">app.js</code>.
+                </div>
+            </div>
+        </div>
+
+        <div id="guest-warning-banner" class="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-4 text-xs text-blue-800 flex items-center justify-between shadow-sm">
+            <div class="flex items-center space-x-3">
+                <i class="fa-solid fa-shield-halved text-blue-500 text-lg"></i>
+                <div>
+                    <span class="font-bold text-blue-900">Modo de visualización (Invitado):</span> Puedes explorar todas las tareas y balances. Inicia sesión con Google para habilitar los botones de agregar, editar y eliminar.
+                </div>
+            </div>
+            <button onclick="openLoginModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl font-semibold transition shrink-0 ml-4">
+                Iniciar sesión ahora
+            </button>
+        </div>
+
+        <div id="quarters-container" class="space-y-6">
+            <div class="text-center py-12 text-slate-400">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-[#00ff88] mb-2"></i>
+                <p>Cargando datos de la aplicación...</p>
+            </div>
+        </div>
+    </main>
+
+    <div id="bottom-action-bar" class="sticky bottom-0 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 shadow-lg z-20 hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-center">
+            <button onclick="openModal()" class="w-full sm:w-auto bg-[#00ff88] hover:bg-[#00e078] text-slate-950 font-bold px-8 py-3.5 rounded-full text-base transition shadow-md hover:shadow-lg flex items-center justify-center space-x-3">
+                <i class="fa-solid fa-plus text-sm"></i>
+                <span>Agregar tarea</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="task-tooltip" class="fixed pointer-events-none hidden z-50 bg-slate-900 text-white text-xs rounded-lg px-3 py-2 shadow-2xl max-w-xs transition-opacity duration-150 border border-slate-700">
+        <div class="font-semibold text-[#00ff88] mb-1 flex items-center justify-between">
+            <span id="tooltip-date"></span>
+            <span class="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded">Fecha exacta</span>
+        </div>
+        <p id="tooltip-notes" class="text-slate-300 whitespace-pre-wrap leading-relaxed"></p>
+    </div>
+
+    <div id="task-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-100">
+            <div class="bg-slate-900 px-6 py-4 flex items-center justify-between">
+                <h3 id="modal-title" class="text-white font-bold text-base flex items-center space-x-2">
+                    <i class="fa-solid fa-file-circle-plus text-[#00ff88]"></i>
+                    <span>Agregar Nueva Tarea</span>
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="task-form" onsubmit="handleFormSubmit(event)" class="p-6 space-y-4">
+                <input type="hidden" id="task-id">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Descripción de la tarea</label>
+                    <input type="text" id="task-desc" required placeholder="Ej. Monthly bag o Cambios en live assets" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00ff88] focus:bg-white transition">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Horas (+ / -)</label>
+                        <input type="number" id="task-hours" required step="0.5" placeholder="Ej. -3 o 10" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00ff88] focus:bg-white transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Fecha</label>
+                        <input type="date" id="task-date" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00ff88] focus:bg-white transition">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1">Notas adicionales</label>
+                    <textarea id="task-notes" rows="3" placeholder="Detalles, enlaces o notas relevantes..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#00ff88] focus:bg-white transition"></textarea>
+                </div>
+                <div class="pt-2 flex items-center justify-end space-x-3">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold transition">Cancelar</button>
+                    <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#00ff88] hover:bg-[#00e078] text-slate-950 text-sm font-bold shadow-sm transition">Guardar en Firebase</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="login-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center space-y-6 border border-slate-100">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-900 text-xl tracking-tight">Acceso Restringido</h3>
+                <p class="text-xs text-slate-500 mt-1.5 leading-relaxed">Inicia sesión con tu cuenta de Google autorizada para agregar, editar y eliminar tareas del sistema.</p>
+            </div>
+            <div class="space-y-3 pt-2">
+                <button onclick="loginWithGoogle()" class="w-full bg-white hover:bg-slate-50 text-slate-800 font-semibold py-3.5 px-4 rounded-2xl text-sm transition shadow-md hover:shadow border border-slate-200 flex items-center justify-center space-x-3 group">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                        <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.2v3.15C3.16 21.32 7.22 24 12 24z"/>
+                        <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.2C.44 8.12 0 9.87 0 11.7c0 1.83.44 3.58 1.2 5.12l4.08-2.55z"/>
+                        <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.22 0 3.16 2.68 1.2 6.58l4.08 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                    </svg>
+                    <span>Iniciar sesión con Google</span>
+                </button>
+                <button onclick="closeLoginModal()" class="w-full text-slate-400 hover:text-slate-600 text-xs font-semibold py-2 transition">
+                    Continuar como invitado (Solo lectura)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
