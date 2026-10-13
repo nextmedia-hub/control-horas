@@ -302,16 +302,17 @@ function renderApp() {
     quartersData.forEach(quarter => {
         const isExpanded = !!expandedQuarters[quarter.id];
 
-        let tempBalance = runningBalance;
+        // 1. Calcular el balance final del trimestre para la cabecera
+        let quarterDelta = 0;
         quarter.months.forEach(month => {
             const monthTasks = tasks.filter(t => {
                 if (t.month) return t.month === month.key;
                 if (t.date) return t.date.substring(5, 7) === month.key;
                 return false;
             });
-            monthTasks.forEach(task => tempBalance += Number(task.hours));
+            monthTasks.forEach(task => quarterDelta += Number(task.hours));
         });
-        const quarterEndingBalance = tempBalance;
+        const quarterEndingBalance = runningBalance + quarterDelta;
 
         const quarterDiv = document.createElement('div');
         quarterDiv.className = 'bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden';
@@ -342,6 +343,15 @@ function renderApp() {
                     if (t.month) return t.month === month.key;
                     if (t.date) return t.date.substring(5, 7) === month.key;
                     return false;
+                });
+
+                // ORDENAR: Asegura que "Monthly bag" quede siempre arriba de todo
+                monthTasks.sort((a, b) => {
+                    const isBagA = a.desc.toLowerCase().includes('monthly bag');
+                    const isBagB = b.desc.toLowerCase().includes('monthly bag');
+                    if (isBagA && !isBagB) return -1;
+                    if (!isBagA && isBagB) return 1;
+                    return 0;
                 });
 
                 const balanceBeforeMonth = runningBalance;
@@ -425,6 +435,19 @@ function renderApp() {
             });
 
             quarterHtml += `</div>`;
+        } else {
+            // Si el trimestre está colapsado, igual sumamos sus horas al runningBalance global 
+            // para que los trimestres posteriores conserven el arrastre correcto.
+            quarter.months.forEach(month => {
+                const monthTasks = tasks.filter(t => {
+                    if (t.month) return t.month === month.key;
+                    if (t.date) return t.date.substring(5, 7) === month.key;
+                    return false;
+                });
+                monthTasks.forEach(task => {
+                    runningBalance += Number(task.hours);
+                });
+            });
         }
 
         quarterDiv.innerHTML = quarterHtml;
